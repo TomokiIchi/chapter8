@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'package:http/http.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:flutter/material.dart';
+import 'package:webfeed/webfeed.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(MyApp());
@@ -9,105 +14,201 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Generated App',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.pink,
+        primaryColor: const Color(0xFFe91e63),
+        accentColor: const Color(0xFFe91e63),
+        canvasColor: const Color(0xFFfafafa),
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: new RssListPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class RssListPage extends StatelessWidget {
+  final List names = ['主要ニュース', '国際情勢', '国内の出来事', 'IT関係'];
+  final List links = [
+    'http://new.yahoo.co.jp/pickup/rss.xml',
+    'http://new.yahoo.co.jp/pickup/world/rss.xml',
+    'http://new.yahoo.co.jp/pickup/domestic/rss.xml',
+    'http://new.yahoo.co.jp/pickup/computer/rss.xml',
+  ];
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Yahoo! checker'),
+      ),
+      body: Center(
+        child: ListView(
+          padding: EdgeInsets.all(10.0),
+          children: items(context),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> items(BuildContext context) {
+    List items = [];
+    for (var i = 0; i < names.length; i++) {
+      items.add(ListTile(
+        contentPadding: EdgeInsets.all(10.0),
+        title: Text(
+          names[i],
+          style: TextStyle(fontSize: 24.0),
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MyRssPage(names[i], links[i]),
+            ),
+          );
+        },
+      ));
+    }
+    return items;
+  }
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class MyRssPage extends StatefulWidget {
+  final String title;
+  final String url;
 
-  void _incrementCounter() {
+  MyRssPage(@required this.title, @required this.url);
+
+  @override
+  _MyRssPageState createState() => new _MyRssPageState(title: title, url: url);
+}
+
+class _MyRssPageState extends State<MyRssPage> {
+  final String title;
+  final String url;
+  List _items = [];
+  _MyRssPageState({@required this.title, @required this.url}) {
+    getItems();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: Center(
+        child: ListView(
+          padding: EdgeInsets.all(10.0),
+          children: _items,
+        ),
+      ),
+    );
+  }
+
+  void getItems() async {
+    List list = [];
+    Response res = await get(url);
+    RssFeed feed = RssFeed.parse(res.body);
+    for (RssItem item in feed.items) {
+      list.add(ListTile(
+        contentPadding: EdgeInsets.all(10.0),
+        title: Text(
+          item.title,
+          style: TextStyle(fontSize: 24.0),
+        ),
+        subtitle: Text(item.pubDate),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  ItemDetailsPage(item: item, title: title, url: url),
+            ),
+          );
+        },
+      ));
+    }
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _items = list;
     });
+  }
+}
+
+class ItemDetailsPage extends StatefulWidget {
+  final String title;
+  final String url;
+  final RssItem item;
+
+  ItemDetailsPage(
+      {@required this.item, @required this.title, @required this.url});
+  @override
+  _ItemDetails createState() => new _ItemDetails(item: item);
+}
+
+class _ItemDetails extends State {
+  RssItem item;
+  Widget _widget = Text('wait...');
+  _ItemDetails({@required this.item});
+  @override
+  void initState() {
+    super.initState();
+    getItem();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    // TODO: implement build
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text(item.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headline4,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      body: _widget,
     );
+  }
+
+  void getItem() async {
+    Response res = await get(item.link);
+    dom.Document doc = dom.Document.html(res.body);
+    dom.Element hbody = doc.querySelector('.hbody');
+    dom.Element htitle = doc.querySelector('.newsTitle a');
+    dom.Element newslink = doc.querySelector('.newsLink');
+    print(newslink.attributes['href']);
+
+    setState(() {
+      _widget = SingleChildScrollView(
+        child: Container(
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.all(10.0),
+                child: Text(
+                  htitle.text,
+                  style: TextStyle(fontSize: 22.0, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(10.0),
+                child: Text(
+                  hbody.text,
+                  style: TextStyle(fontSize: 20.0),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(10.0),
+                child: RaisedButton(
+                  child: Text(
+                    '続きを読む...',
+                    style: TextStyle(fontSize: 18.0),
+                  ),
+                  onPressed: () {
+                    launch(newslink.attributes['href']);
+                  },
+                ),
+              )
+            ],
+          ),
+        ),
+      );
+    });
   }
 }
